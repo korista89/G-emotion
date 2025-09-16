@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBRST 행동데이터 시스템 (업데이트)</title>
+<style>
+  body {font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;margin:0;padding:20px;background:#f5f5f5}
+  .container {max-width:1100px;margin:0 auto;background:white;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.12);overflow:hidden}
+  .header {background:#4a90e2;color:white;padding:20px;text-align:center}
+  .tabs {display:flex;background:#e8e8e8;gap:2px}
+  .tab-btn {flex:1;padding:14px 10px;background:#dcdcdc;border:none;cursor:pointer;font-size:16px;font-weight:700}
+  .tab-btn.active {background:white;color:#4a90e2}
+  .content {padding:26px}
+  .tab-content {display:none}
+  .tab-content.active {display:block}
+  input,select,textarea {width:100%;padding:10px;margin:5px 0;border:1px solid #ddd;border-radius:8px;box-sizing:border-box}
+  button {background:#4a90e2;color:white;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;font-size:15px;margin:6px 5px}
+  button:hover {background:#357abd}
+  table {width:100%;border-collapse:collapse;margin-top:14px}
+  th,td {border:1px solid #e6e6e6;padding:10px;text-align:center;font-size:14px}
+  th {background:#fafafa}
+  .form-group {margin:16px 0}
+  .form-row {display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:center}
+  .msg {padding:10px;border-radius:8px;margin:10px 0}
+  .success {background:#d4edda;color:#155724}
+  .error {background:#f8d7da;color:#721c24}
+  .hidden {display:none}
+  #canvas {border:1px solid #ddd;margin-top:16px;border-radius:8px}
+  .analysis-box {background:#f8f9fa;padding:16px;border-radius:8px;margin-top:16px}
+  .analysis-box h4 {margin-top:14px;color:#333}
+  .chk-row {display:flex;gap:10px;flex-wrap:wrap}
+  .chk-row label {display:flex;align-items:center;gap:6px;background:#f7f7f7;border:1px solid #e8e8e8;padding:6px 10px;border-radius:20px}
+  .danger {background:#e74c3c}
+  .danger:hover {background:#c0392b}
+  .muted {background:#9aa5b1}
+  .muted:hover {background:#7b8794}
+  .note {font-size:12px;color:#666}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📊 IBRST 행동데이터 시스템</h1>
+  </div>
+
+  <!-- 8. 탭 위치: 데이터입력, 차트분석, 학생등록 순서 -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="input">데이터 입력</button>
+    <button class="tab-btn" data-tab="chart">차트 분석</button>
+    <button class="tab-btn" data-tab="register">학생 등록</button>
+  </div>
+
+  <div class="content">
+    <!-- 데이터 입력 -->
+    <div id="input" class="tab-content active">
+      <h2>데이터 입력</h2>
+      <div class="form-group form-row">
+        <label>학생 선택:</label>
+        <select id="student-select">
+          <option value="">-- 학생을 선택하세요 --</option>
+        </select>
+      </div>
+
+      <div id="input-form" class="hidden">
+        <div class="form-group form-row">
+          <label>날짜:</label>
+          <input type="date" id="input-date">
+        </div>
+
+        <!-- 2. 점수 입력(숫자 + 체크박스 가로 배치) -->
+        <div class="form-group">
+          <div class="form-row">
+            <label>증가 목표행동 점수 (0–5):</label>
+            <input type="number" id="inc-score" min="0" max="5" step="1" inputmode="numeric">
+          </div>
+          <div class="chk-row" id="inc-score-chks"></div>
+          <div class="note">숫자 입력 또는 체크박스 선택 중 편한 방식을 사용하세요.</div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-row">
+            <label>감소 목표행동 점수 (0–5):</label>
+            <input type="number" id="dec-score" min="0" max="5" step="1" inputmode="numeric">
+          </div>
+          <div class="chk-row" id="dec-score-chks"></div>
+        </div>
+
+        <div class="form-group form-row">
+          <label>메모:</label>
+          <textarea id="input-memo" rows="2" placeholder="짧은 메모 (선택)"></textarea>
+        </div>
+
+        <div>
+          <button id="save-data-btn">데이터 저장</button>
+          <button id="delete-student-btn" class="danger">학생 삭제(전체 데이터)</button>
+          <span class="note">• 저장 후 날짜는 자동으로 다음 날짜로 이동</span>
+        </div>
+
+        <div id="data-msg" class="msg hidden"></div>
+
+        <h3 style="margin-top:16px;">데이터 기록</h3>
+        <table id="data-table">
+          <thead>
+            <tr><th>회기</th><th>날짜</th><th>증가</th><th>감소</th><th>메모</th><th>삭제</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 차트 분석 -->
+    <div id="chart" class="tab-content">
+      <h2>차트 분석</h2>
+      <div class="form-group form-row">
+        <label>학생 선택:</label>
+        <select id="chart-student">
+          <option value="">-- 학생을 선택하세요 --</option>
+        </select>
+      </div>
+      <button id="draw-chart-btn">차트 그리기</button>
+      <canvas id="canvas" width="900" height="520" class="hidden"></canvas>
+      <div id="analysis" class="hidden"></div>
+    </div>
+
+    <!-- 학생 등록 -->
+    <div id="register" class="tab-content">
+      <h2>학생 등록</h2>
+      <div class="form-group form-row">
+        <label>학생 이름:</label>
+        <input type="text" id="student-name" placeholder="예: 김민수">
+      </div>
+      <div class="form-group form-row">
+        <label>학년:</label>
+        <select id="student-grade">
+          <option value="">-- 선택 --</option>
+          <option>유치원</option>
+          <option>초1</option><option>초2</option><option>초3</option>
+          <option>초4</option><option>초5</option><option>초6</option>
+          <option>중1</option><option>중2</option><option>중3</option>
+          <option>고1</option><option>고2</option><option>고3</option>
+        </select>
+      </div>
+      <div class="form-group form-row">
+        <label>증가 목표행동:</label>
+        <input type="text" id="inc-behavior" placeholder="예: 과제참여">
+      </div>
+      <div class="form-group form-row">
+        <label>감소 목표행동:</label>
+        <input type="text" id="dec-behavior" placeholder="예: 자리이탈">
+      </div>
+      <div>
+        <button id="register-btn">학생 등록</button>
+        <button id="reset-local-btn" class="muted">로컬 데이터 초기화</button>
+      </div>
+      <div id="register-msg" class="msg hidden"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 전역 =====
+let students = [];
+let dataRecords = {};
+let currentStudent = null;
+
+// ★ 배포된 Apps Script WebApp URL을 여기에 붙여넣으세요.
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyE9fJcOS-h5O9RhEk4Evh9yOim-FMiB6l5MySGXF3FS4INYZzcdFfjv5jJdcHcMxyc/exec";
+
+// ===== 유틸 =====
+function showMessage(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = 'msg ' + type;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+function saveToStorage() {
+  localStorage.setItem('ibrst_students', JSON.stringify(students));
+  localStorage.setItem('ibrst_data', JSON.stringify(dataRecords));
+}
+function loadFromStorage() {
+  try {
+    const s = localStorage.getItem('ibrst_students');
+    const d = localStorage.getItem('ibrst_data');
+    if (s) students = JSON.parse(s);
+    if (d) dataRecords = JSON.parse(d);
+  } catch(e) { console.log('로드 오류:', e); }
+}
+
+function updateStudentLists() {
+  ['student-select','chart-student'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">-- 학생을 선택하세요 --</option>';
+    students.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.grade})</option>`);
+  });
+}
+
+// 체크박스 빌더
+function buildScoreChecks(containerId, inputId) {
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = '';
+  for (let i=0;i<=5;i++) {
+    const lid = `${containerId}-v${i}`;
+    const lab = document.createElement('label');
+    lab.innerHTML = `<input type="radio" name="${containerId}" id="${lid}" value="${i}"> ${i}`;
+    cont.appendChild(lab);
+  }
+  // 동기화: 체크 → 입력
+  cont.addEventListener('change', (e)=>{
+    const v = parseInt(e.target.value);
+    const inp = document.getElementById(inputId);
+    inp.value = v;
+  });
+  // 입력 → 체크
+  document.getElementById(inputId).addEventListener('input', (e)=>{
+    let v = parseInt(e.target.value);
+    if (isNaN(v)) return;
+    if (v<0) v=0; if (v>5) v=5;
+    e.target.value = v;
+    const radios = cont.querySelectorAll('input[type=radio]');
+    radios.forEach(r => r.checked = (parseInt(r.value)===v));
+  });
+}
+
+// ===== 초기화 =====
+document.addEventListener('DOMContentLoaded', async () => {
+  loadFromStorage();
+
+  // 탭 전환
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById(this.dataset.tab).classList.add('active');
+    });
+  });
+
+  // 이벤트
+  document.getElementById('register-btn').addEventListener('click', registerStudent);
+  document.getElementById('reset-local-btn').addEventListener('click', ()=>{localStorage.clear();location.reload();});
+  document.getElementById('save-data-btn').addEventListener('click', saveData);
+  document.getElementById('student-select').addEventListener('change', onSelectStudent);
+  document.getElementById('draw-chart-btn').addEventListener('click', drawChart);
+  document.getElementById('delete-student-btn').addEventListener('click', deleteStudentAll);
+
+  // 날짜 초기값
+  document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+
+  // 점수 체크박스 생성
+  buildScoreChecks('inc-score-chks','inc-score');
+  buildScoreChecks('dec-score-chks','dec-score');
+
+  // 최신 서버 데이터 동기화(11,12)
+  await syncFromServer();
+
+  updateStudentLists();
+});
+
+// ===== 학생 등록 =====
+async function registerStudent() {
+  const name = document.getElementById('student-name').value.trim();
+  const grade = document.getElementById('student-grade').value;
+  const incBehavior = document.getElementById('inc-behavior').value.trim();
+  const decBehavior = document.getElementById('dec-behavior').value.trim();
+
+  if (!name || !grade || !incBehavior || !decBehavior) {
+    showMessage('register-msg','모든 항목을 입력해주세요.','error'); return;
+  }
+
+  const student = { id: Date.now().toString(), name, grade, incBehavior, decBehavior };
+  students.push(student);
+  dataRecords[student.id] = [];
+  saveToStorage();
+  updateStudentLists();
+
+  // 서버 동기화
+  try {
+    await fetch(WEBAPP_URL, { method:'POST', body: JSON.stringify({action:'registerStudent', student}) });
+  } catch(e) { console.log(e); }
+
+  document.getElementById('student-name').value='';
+  document.getElementById('student-grade').value='';
+  document.getElementById('inc-behavior').value='';
+  document.getElementById('dec-behavior').value='';
+  showMessage('register-msg','학생이 등록되었습니다.','success');
+}
+
+// ===== 학생 선택 =====
+async function onSelectStudent() {
+  const studentId = document.getElementById('student-select').value;
+  if (!studentId) { document.getElementById('input-form').classList.add('hidden'); return; }
+  currentStudent = students.find(s => s.id === studentId);
+  document.getElementById('input-form').classList.remove('hidden');
+
+  // 서버에서 최신 세션 불러오기
+  try {
+    const res = await fetch(`${WEBAPP_URL}?action=getStudentData&studentId=${encodeURIComponent(studentId)}`);
+    const payload = await res.json();
+    if (payload && Array.isArray(payload.records)) {
+      dataRecords[studentId] = payload.records;
+      saveToStorage();
+    }
+  } catch(e){ console.log(e); }
+  updateDataTable();
+}
+
+// ===== 데이터 저장 =====
+async function saveData() {
+  if (!currentStudent) return;
+  const date = document.getElementById('input-date').value;
+  const incScore = parseInt(document.getElementById('inc-score').value);
+  const decScore = parseInt(document.getElementById('dec-score').value);
+  const memo = document.getElementById('input-memo').value;
+
+  if (!date || isNaN(incScore) || isNaN(decScore)) {
+    showMessage('data-msg','날짜와 점수를 입력해주세요.','error'); return;
+  }
+  if (incScore<0 || incScore>5 || decScore<0 || decScore>5) {
+    showMessage('data-msg','점수는 0–5 사이여야 합니다.','error'); return;
+  }
+
+  const studentData = dataRecords[currentStudent.id] || [];
+  // 회기 결정: 같은 날짜가 있으면 그 회기를 대체, 없으면 +1
+  let session = 1;
+  const sameDate = studentData.filter(d => d.date === date);
+  if (sameDate.length>0) {
+    session = sameDate[0].session;
+    studentData.forEach(d => { if (d.session===session) d.valid = false; });
+  } else {
+    const sessions = studentData.map(d => d.session);
+    session = sessions.length>0 ? Math.max(...sessions)+1 : 1;
+  }
+
+  const newData = { session, date, incScore, decScore, memo, timestamp: Date.now(), valid:true };
+  studentData.push(newData);
+  dataRecords[currentStudent.id] = studentData;
+  saveToStorage();
+
+  // 서버 반영
+  try {
+    await fetch(WEBAPP_URL, { method:'POST', body: JSON.stringify({action:'upsertRecord', studentId: currentStudent.id, record: newData}) });
+  } catch(e){ console.log(e); }
+
+  // 1. 날짜 저장 후 다음 날짜로 이동
+  const nextDate = new Date(date); nextDate.setDate(nextDate.getDate()+1);
+  document.getElementById('input-date').value = nextDate.toISOString().split('T')[0];
+
+  // 입력 초기화 & 테이블 갱신
+  document.getElementById('inc-score').value='';
+  document.getElementById('dec-score').value='';
+  document.getElementById('input-memo').value='';
+  document.querySelectorAll('#inc-score-chks input, #dec-score-chks input').forEach(r=>r.checked=false);
+
+  updateDataTable();
+  showMessage('data-msg','데이터가 저장되었습니다.','success');
+}
+
+// ===== 레코드 삭제(회기별) =====
+async function deleteRecord(session) {
+  if (!currentStudent) return;
+  // 로컬: 해당 회기의 valid=false 처리 + 즉시 테이블 갱신
+  const arr = dataRecords[currentStudent.id] || [];
+  arr.forEach(d => { if (d.session===session) d.valid=false; });
+  saveToStorage();
+  updateDataTable();
+
+  // 서버 삭제
+  try {
+    await fetch(WEBAPP_URL, { method:'POST', body: JSON.stringify({action:'deleteRecord', studentId: currentStudent.id, session}) });
+  } catch(e){ console.log(e); }
+}
+
+// ===== 학생 전체 삭제 =====
+async function deleteStudentAll() {
+  if (!currentStudent) return;
+  if (!confirm('학생 전체 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+
+  // 로컬 제거
+  const id = currentStudent.id;
+  students = students.filter(s => s.id !== id);
+  delete dataRecords[id];
+  currentStudent = null;
+  saveToStorage();
+  updateStudentLists();
+  document.getElementById('input-form').classList.add('hidden');
+
+  // 서버 제거
+  try {
+    await fetch(WEBAPP_URL, { method:'POST', body: JSON.stringify({action:'deleteStudent', studentId: id}) });
+  } catch(e){ console.log(e); }
+
+  showMessage('data-msg','학생 데이터가 삭제되었습니다.','success');
+}
+
+// ===== 서버 → 로컬 동기화 =====
+async function syncFromServer() {
+  if (!WEBAPP_URL || WEBAPP_URL.startsWith('YOUR_')) return; // URL 미설정 시 스킵
+  try {
+    const res = await fetch(`${WEBAPP_URL}?action=getAll`);
+    const payload = await res.json();
+    if (payload && Array.isArray(payload.students)) {
+      students = payload.students;
+      dataRecords = payload.dataRecords || {};
+      saveToStorage();
+    }
+  } catch(e){ console.log(e); }
+}
+
+// ===== 테이블 =====
+function updateDataTable() {
+  if (!currentStudent) return;
+  const tbody = document.querySelector('#data-table tbody');
+  const data = dataRecords[currentStudent.id] || [];
+  const validBySession = {};
+  data.forEach(d => { if (d.valid) validBySession[d.session] = d; });
+  const rows = Object.values(validBySession).sort((a,b)=>a.session-b.session);
+  if (rows.length===0) {
+    tbody.innerHTML = '<tr><td colspan="6">데이터가 없습니다.</td></tr>'; return;
+  }
+  let html = '';
+  rows.forEach(d => {
+    html += `<tr>
+      <td>${d.session}</td>
+      <td>${d.date}</td>
+      <td>${d.incScore}</td>
+      <td>${d.decScore}</td>
+      <td>${d.memo || '-'}</td>
+      <td><button class="danger" onclick="deleteRecord(${d.session})">삭제</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ===== 차트 =====
+function drawChart() {
+  const studentId = document.getElementById('chart-student').value;
+  if (!studentId) { alert('학생을 선택해주세요.'); return; }
+  const student = students.find(s => s.id === studentId);
+  const data = (dataRecords[studentId] || []).filter(d=>d.valid).sort((a,b)=>a.session-b.session);
+  if (data.length < 3) { alert('최소 3회기 이상의 데이터가 필요합니다.'); return; }
+
+  const canvas = document.getElementById('canvas');
+  canvas.classList.remove('hidden');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+  // 제목
+  ctx.fillStyle='#333'; ctx.font='bold 18px Arial'; ctx.textAlign='center';
+  ctx.fillText(`${student.name} 학생 행동 데이터 차트`, W/2, 28);
+
+  const padLeft=70, padTop=60, padRight=60, padBottom=90;
+  const cw = W - padLeft - padRight, ch = H - padTop - padBottom;
+
+  // 축/격자
+  ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=0.7;
+  for (let i=0;i<=5;i++){
+    const y = padTop + (ch/5)*i;
+    ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(padLeft+cw, y); ctx.stroke();
+  }
+
+  const xStep = cw / (data.length - 1);
+  for (let i=0;i<data.length;i++){
+    const x = padLeft + i*xStep;
+    ctx.beginPath(); ctx.moveTo(x, padTop); ctx.lineTo(x, padTop+ch); ctx.stroke();
+  }
+
+  // 축
+  ctx.strokeStyle='#000'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, padTop);
+  ctx.lineTo(padLeft, padTop+ch);
+  ctx.lineTo(padLeft+cw, padTop+ch);
+  ctx.stroke();
+
+  // y축 눈금
+  ctx.lineWidth=1; ctx.fillStyle='#333'; ctx.textAlign='right'; ctx.font='12px Arial';
+  for (let i=0;i<=5;i++){
+    const y = padTop + ch - (ch/5)*i;
+    ctx.beginPath(); ctx.moveTo(padLeft-5, y); ctx.lineTo(padLeft, y); ctx.stroke();
+    ctx.fillText(i, padLeft-10, y+4);
+  }
+
+  // x축 날짜
+  ctx.textAlign='center'; ctx.font='11px Arial';
+  data.forEach((d,i)=>{
+    const x = padLeft + i*xStep;
+    ctx.beginPath(); ctx.moveTo(x, padTop+ch); ctx.lineTo(x, padTop+ch-5); ctx.stroke();
+    const dt = new Date(d.date); const ds = `${dt.getMonth()+1}/${dt.getDate()}`;
+    ctx.fillText(ds, x, padTop+ch+18);
+    ctx.fillText(`${d.session}회기`, x, padTop+ch+34);
+  });
+
+  // 3. 기초선 길이(기본 3회로 변경)
+  const BASE_N = 3;
+  const baseline = data.slice(0, Math.min(BASE_N, data.length));
+  const intervention = data.slice(baseline.length);
+
+  // 5. 중재 구분선(3회기와 4회기 사이 중앙)
+  if (intervention.length>0){
+    const x3 = padLeft + (baseline.length-1)*xStep; // 3회기 x
+    const x4 = padLeft + (baseline.length)*xStep;   // 4회기 x
+    const xc = (x3 + x4) / 2;
+    ctx.strokeStyle='#000'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(xc, padTop); ctx.lineTo(xc, padTop+ch); ctx.stroke();
+  }
+
+  // 6. 3→4 연결 끊기: 선을 두 구간으로 나눠 그림
+  function yFrom(score){ return padTop + ch - (score/5)*ch; }
+
+  // 증가(파란)
+  ctx.strokeStyle='#4a90e2'; ctx.lineWidth=2;
+  ctx.beginPath();
+  baseline.forEach((d,i)=>{ const x=padLeft+i*xStep, y=yFrom(d.incScore); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  if (intervention.length>0){
+    ctx.beginPath();
+    intervention.forEach((d,i)=>{ const x=padLeft+(baseline.length+i)*xStep, y=yFrom(d.incScore); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.stroke();
+  }
+
+  // 감소(빨강)
+  ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2;
+  ctx.beginPath();
+  baseline.forEach((d,i)=>{ const x=padLeft+i*xStep, y=yFrom(d.decScore); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  if (intervention.length>0){
+    ctx.beginPath();
+    intervention.forEach((d,i)=>{ const x=padLeft+(baseline.length+i)*xStep, y=yFrom(d.decScore); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.stroke();
+  }
+
+  // 데이터 포인트
+  data.forEach((d,i)=>{
+    const x = padLeft + i*xStep;
+    // 증가: 원
+    let y = yFrom(d.incScore);
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#4a90e2'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#4a90e2'; ctx.font='bold 11px Arial'; ctx.fillText(d.incScore, x, y-10);
+
+    // 감소: 삼각형
+    y = yFrom(d.decScore);
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#e74c3c';
+    ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x-5,y+4); ctx.lineTo(x+5,y+4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#e74c3c'; ctx.fillText(d.decScore, x, y+20);
+  });
+
+  // 7. '기초선' / '중재' 표시
+  ctx.fillStyle='#000'; ctx.font='bold 14px Arial'; ctx.textAlign='center';
+  if (baseline.length>0){
+    const bx0 = padLeft, bx1 = padLeft + (baseline.length-1)*xStep;
+    ctx.fillText('기초선', (bx0+bx1)/2, padTop-12);
+  }
+  if (intervention.length>0){
+    const ix0 = padLeft + baseline.length*xStep, ix1 = padLeft + (data.length-1)*xStep;
+    ctx.fillText('중재', (ix0+ix1)/2, padTop-12);
+  }
+
+  // 범례
+  ctx.fillStyle='#4a90e2'; ctx.fillRect(padLeft+cw-170, padTop+10, 14, 14);
+  ctx.fillStyle='#333'; ctx.font='12px Arial'; ctx.textAlign='left';
+  ctx.fillText('증가 목표행동', padLeft+cw-150, padTop+21);
+
+  ctx.fillStyle='#e74c3c'; ctx.fillRect(padLeft+cw-170, padTop+34, 14, 14);
+  ctx.fillStyle='#333'; ctx.fillText('감소 목표행동', padLeft+cw-150, padTop+45);
+
+  // 분석
+  performABAAnalysis(student, data, BASE_N);
+}
+
+// ===== 분석(4. 문구 수정 포함 / 3. 기본 기초선=3회) =====
+function performABAAnalysis(student, data, BASE_N) {
+  const analysis = document.getElementById('analysis');
+  analysis.classList.remove('hidden');
+
+  const baselineData = data.slice(0, Math.min(BASE_N, data.length));
+  const interventionData = data.slice(Math.min(BASE_N, data.length));
+
+  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const trend = arr => {
+    const n=arr.length, xs=[...Array(n).keys()];
+    const sumX=xs.reduce((a,b)=>a+b,0);
+    const sumY=arr.reduce((a,b)=>a+b,0);
+    const sumXY=arr.reduce((s,y,i)=>s+i*y,0);
+    const sumX2=xs.reduce((s,i)=>s+i*i,0);
+    const slope=(n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX || 1);
+    return slope>0.05?'상승':(slope<-0.05?'하락':'안정');
+  };
+
+  const incScores = data.map(d=>d.incScore);
+  const decScores = data.map(d=>d.decScore);
+  const baseInc = baselineData.map(d=>d.incScore);
+  const baseDec = baselineData.map(d=>d.decScore);
+  const intInc = interventionData.map(d=>d.incScore);
+  const intDec = interventionData.map(d=>d.decScore);
+
+  let html = '<div class="analysis-box">';
+  html += `<h3>${student.name} (${student.grade}) 행동 분석 결과</h3>`;
+
+  html += '<h4>1. 기술통계</h4>';
+  html += `<p>• 증가 목표행동(${student.incBehavior}): 전체 평균 ${mean(incScores).toFixed(2)}점</p>`;
+  html += `<p>• 감소 목표행동(${student.decBehavior}): 전체 평균 ${mean(decScores).toFixed(2)}점</p>`;
+
+  if (interventionData.length>0) {
+    html += '<h4>2. 단계별 분석</h4>';
+    const baseIncM = mean(baseInc).toFixed(2);
+    const intIncM = mean(intInc).toFixed(2);
+    const baseDecM = mean(baseDec).toFixed(2);
+    const intDecM = mean(intDec).toFixed(2);
+    const incPct = ((intInc - baseInc.reduce((a,b)=>a+b,0)/baseInc.length) / (baseInc.reduce((a,b)=>a+b,0)/baseInc.length) * 100).toFixed(1);
+    const decPct = ((baseDec.reduce((a,b)=>a+b,0)/baseDec.length - intDec) / (baseDec.reduce((a,b)=>a+b,0)/baseDec.length) * 100).toFixed(1);
+
+    // 4. 문구 변경
+    html += `<p>• 기초선 증가목표행동: ${baseIncM}점 → 중재구간 증가목표행동 ${intIncM}점 (${(( (mean(intInc)-mean(baseInc))/mean(baseInc))*100).toFixed(1)}% 변화)</p>`;
+    html += `<p>• 기초선 감소목표행동: ${baseDecM}점 → 중재구간 감소목표행동 ${intDecM}점 (${(( (mean(baseDec)-mean(intDec))/mean(baseDec))*100).toFixed(1)}% 감소)</p>`;
+
+    html += '<h4>3. 경향성 분석</h4>';
+    html += `<p>• 증가 목표행동: ${trend(intInc)} 경향</p>`;
+    html += `<p>• 감소 목표행동: ${trend(intDec)} 경향</p>`;
+
+    // PND
+    const pndInc = intInc.filter(v => v > Math.max(...baseInc)).length / intInc.length * 100;
+    const pndDec = intDec.filter(v => v < Math.min(...baseDec)).length / intDec.length * 100;
+    html += '<h4>4. 효과크기 (PND)</h4>';
+    html += `<p>• 증가 목표행동 PND: ${pndInc.toFixed(1)}%</p>`;
+    html += `<p>• 감소 목표행동 PND: ${pndDec.toFixed(1)}%</p>`;
+  }
+
+  html += '<h4>5. 중재 권고</h4>';
+  const incMean = mean(incScores), decMean = mean(decScores);
+  if (incMean < 2.5) html += '<p>• 강화(강화물 재평가, 강화계획 조정) 필요</p>';
+  if (decMean > 2.5) html += '<p>• 선행사건 수정(Antecedent) 및 대체행동 지도 강화</p>';
+  if (incMean >= 4 && decMean <= 1) html += '<p>• 유지·일반화 단계 전환 검토</p>';
+  html += '<p>• 주간 팀 미팅에서 데이터 검토 권장</p>';
+
+  html += '</div>';
+  analysis.innerHTML = html;
+}
+</script>
+</body>
+</html>
